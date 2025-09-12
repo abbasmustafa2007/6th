@@ -3,14 +3,21 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Dashboard - النسخة التجريبية</title>
+<title>Study Dashboard - النسخة التجريبية المتكاملة</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="header">
-  <div class="h1">Study Dashboard — الملف الرئيسي</div>
-  <button id="menuBtn" class="menu-btn" aria-label="قائمة">☰</button>
+  <div class="h-left">
+    <button id="menuBtn" class="menu-btn" aria-label="قائمة">☰</button>
+    <span class="h-title">Study Dashboard — الملف الرئيسي</span>
+  </div>
+  <div class="h-right">
+    <label class="small muted">عرض يوم:</label>
+    <input id="viewDate" type="date" />
+    <button id="goDate" class="btn small">عرض</button>
+  </div>
 </header>
 
 <nav id="sidebar" class="sidebar" aria-hidden="true">
@@ -23,7 +30,7 @@
     <button class="navlink" data-tab="archive">🗂️ الأرشيف</button>
     <button class="navlink" data-tab="add">➕ إضافة واجب</button>
     <hr>
-    <div class="small muted">البيانات تُحمّل من ملف <code>data.js</code>. يمكنك تعديل البيانات يدوياً أو من داخل الموقع.</div>
+    <div class="small muted">البيانات تُحمّل من <code>data.js</code>. يمكنك إضافة واجبات أو تصدير البيانات.</div>
     <div style="margin-top:10px">
       <button id="exportBtn" class="btn">تصدير data.js</button>
       <button id="resetBtn" class="btn ghost">إعادة الحالة الأولية</button>
@@ -81,7 +88,7 @@
 
 </main>
 
-<!-- Exam modal -->
+<!-- Exam modal (same-page) -->
 <div id="examModal" class="modal section-hidden" role="dialog" aria-modal="true">
   <div class="modal-inner card">
     <div style="text-align:left"><button id="closeExam" class="btn ghost">إغلاق</button></div>
