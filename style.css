@@ -11,13 +11,16 @@
 *{box-sizing:border-box}
 body{font-family: system-ui, Arial, "Segoe UI", Tahoma;direction:rtl;margin:0;background:var(--bg);color:#111}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#fff}
-.h1{font-weight:600}
+.h-left{display:flex;align-items:center;gap:12px}
+.h-title{font-weight:600}
 .menu-btn{font-size:20px;background:none;border:0;color:#fff;cursor:pointer}
+.h-right{display:flex;align-items:center;gap:8px}
 .container{max-width:1100px;margin:16px auto;padding:12px}
 .card{background:var(--card);padding:14px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(16,24,40,0.06);margin-bottom:14px}
 .tasks-list{list-style:none;padding:0;margin:0}
 .tasks-list li{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:8px;margin-bottom:8px;background:#f0f6ff}
 .btn{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+.btn.small{padding:6px 8px;font-size:13px}
 .btn.ghost{background:transparent;color:var(--muted);border:1px solid #e6eefc}
 .small{font-size:13px}
 .muted{color:var(--muted)}
