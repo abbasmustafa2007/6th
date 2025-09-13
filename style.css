@@ -1,0 +1,57 @@
+/* style.css - responsive, brown/black/white theme */
+:root{
+  --bg: #ffffff;
+  --card: #ffffff;
+  --brown-1: #5b402f;
+  --brown-2: #8b6a53;
+  --brown-3: #d9c8b6;
+  --black: #111111;
+  --muted: #6b6b6b;
+  --success: #2a7f5a;
+  --radius: 12px;
+  --max-width: 1100px;
+}
+*{box-sizing:border-box}
+body{font-family: system-ui, "Segoe UI", Roboto, Arial; direction:rtl; margin:0; color:var(--black); background:var(--bg)}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(90deg,var(--brown-1),var(--brown-2));color:#fff}
+.h-left{display:flex;align-items:center;gap:12px}
+.h-title{font-weight:700;font-size:18px}
+.menu-btn{font-size:20px;background:none;border:0;color:#fff;cursor:pointer;padding:6px}
+.h-right{display:flex;align-items:center;gap:8px}
+.container{max-width:var(--max-width);margin:16px auto;padding:12px}
+.card{background:var(--card);padding:14px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(0,0,0,0.06);margin-bottom:14px;border:1px solid rgba(0,0,0,0.04)}
+.tasks-list{list-style:none;padding:0;margin:0}
+.tasks-list li{display:flex;flex-direction:row;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;margin-bottom:8px;background:linear-gradient(0deg,#fff,#fbf9f7);border:1px solid rgba(91,64,47,0.06)}
+.btn{background:var(--brown-2);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+.btn.small{padding:6px 8px;font-size:13px}
+.btn.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.15)}
+.btn.exam-submit{background:var(--brown-1);padding:10px 14px;font-weight:700}
+.section-hidden{display:none}
+.form-row{margin-top:8px}
+input[type="text"],input[type="date"],input[type="number"],textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #e9e4e0;background:#fff;font-size:14px;margin-top:6px;color:var(--black)}
+.stat{display:flex;gap:12px;flex-wrap:wrap}
+.stat .box{background:#fff;padding:10px;border-radius:8px;min-width:140px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.sidebar{position:fixed;top:0;right:-360px;width:320px;height:100%;background:linear-gradient(180deg,var(--brown-1),var(--brown-2));color:#fff;transition:right 0.28s ease;padding:18px;z-index:1200;overflow:auto;border-left:2px solid rgba(0,0,0,0.06)}
+.sidebar.open{right:0}
+.sidebar .sidebar-title{font-weight:800;margin-bottom:12px}
+.navlink{display:block;padding:12px;border-radius:8px;margin-bottom:6px;border:0;background:transparent;text-align:right;color:#fff;cursor:pointer;font-weight:600}
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);display:none;z-index:1100}
+.overlay.show{display:block}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:92%;max-width:880px;z-index:1300}
+.modal-inner{padding:12px;border-radius:12px}
+.exam-card{border:3px solid var(--brown-1);background:#fff}
+.exam-question{background:linear-gradient(180deg,#fff,#faf7f4);padding:12px;border-radius:10px;border:1px solid rgba(91,64,47,0.06);margin-top:10px}
+.progress{height:12px;background:#eee;border-radius:8px;overflow:hidden}
+.progress > div{height:100%;background:var(--brown-1);width:0%}
+.footer{margin-top:18px}
+.small{font-size:13px}
+.muted{color:var(--muted)}
+
+/* responsive */
+@media(max-width:900px){
+  .h-right{display:none}
+  .sidebar{width:100%;right:-100%}
+  .sidebar.open{right:0}
+  .tasks-list li{flex-direction:column;align-items:flex-start}
+  .container{padding:10px}
+}

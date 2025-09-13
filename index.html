@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>منصة الدراسة — النسخة النهائية التجريبية</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="h-left">
+    <button id="menuBtn" class="menu-btn" aria-label="فتح القائمة">☰</button>
+    <div class="h-title">منصة الدراسة</div>
+  </div>
+  <div class="h-right">
+    <div class="small muted">اليوم:</div>
+    <input id="viewDate" type="date" aria-label="اختيار التاريخ">
+    <button id="todayBtn" class="btn small ghost">اليوم</button>
+    <button id="goDate" class="btn small">عرض</button>
+  </div>
+</header>
+
+<nav id="sidebar" class="sidebar" aria-hidden="true">
+  <div class="sidebar-inner">
+    <div class="sidebar-title">القائمة</div>
+    <button class="navlink" data-tab="dashboard">🏠 الرئيسية</button>
+    <button class="navlink" data-tab="reports">📑 التقارير</button>
+    <button class="navlink" data-tab="grades">📚 الدرجات</button>
+    <button class="navlink" data-tab="stats">📈 الإحصائيات</button>
+    <button class="navlink" data-tab="archive">🗂️ الأرشيف</button>
+    <button class="navlink" data-tab="add">➕ إضافة واجب</button>
+    <hr>
+    <div class="small muted">البيانات تُحمّل من ملف <code>data.js</code> + التخزين المحلي.</div>
+    <div style="margin-top:10px">
+      <button id="exportBtn" class="btn">تصدير data.js</button>
+      <button id="resetBtn" class="btn ghost">إعادة الحالة الأولية</button>
+    </div>
+  </div>
+</nav>
+<div id="overlay" class="overlay" tabindex="-1"></div>
+
+<main class="container">
+
+  <section id="dashboard" class="card">
+    <h2>مهام اليوم <small id="todayDate"></small></h2>
+    <ul id="todayList" class="tasks-list" aria-live="polite"></ul>
+
+    <h3>الامتحانات اليوم</h3>
+    <div id="examsArea"></div>
+  </section>
+
+  <section id="add" class="card section-hidden">
+    <h2>إضافة واجب جديد</h2>
+    <div class="form-row"><label>المادة</label><input id="new_subject" placeholder="مثال: كيمياء"></div>
+    <div class="form-row"><label>الوصف</label><input id="new_content" placeholder="مثال: مراجعة الفصل 1"></div>
+    <div class="form-row"><label>عدد الساعات</label><input id="new_hours" type="number" value="1" min="1"></div>
+    <div class="form-row"><label>التاريخ</label><input id="new_date" type="date"></div>
+    <div style="margin-top:8px"><button id="saveTask" class="btn">حفظ وإضافة</button></div>
+  </section>
+
+  <section id="reports" class="card section-hidden">
+    <h2>التقارير</h2>
+    <div id="reportsContent"></div>
+  </section>
+
+  <section id="grades" class="card section-hidden">
+    <h2>الدرجات</h2>
+    <div id="gradesContent"></div>
+  </section>
+
+  <section id="stats" class="card section-hidden">
+    <h2>الإحصائيات</h2>
+    <div id="statsContent"></div>
+  </section>
+
+  <section id="archive" class="card section-hidden">
+    <h2>الأرشيف</h2>
+    <div id="archiveContent"></div>
+  </section>
+
+</main>
+
+<!-- Exam modal -->
+<div id="examModal" class="modal section-hidden" role="dialog" aria-modal="true">
+  <div class="modal-inner card exam-card">
+    <div style="text-align:left"><button id="closeExam" class="btn ghost">إغلاق</button></div>
+    <h3 id="examTitleShow"></h3>
+    <div id="examQuestions"></div>
+    <div style="margin-top:10px"><button id="submitExamBtn" class="btn exam-submit">تسليم الامتحان</button></div>
+    <div id="examResult" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<footer class="footer muted small" style="text-align:center;padding:10px">نسخة تجريبية — البيانات تحفظ محليًا فقط</footer>
+
+<script src="data.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
