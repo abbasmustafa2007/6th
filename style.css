@@ -44,10 +44,6 @@ header {
   margin: 0;
 }
 
-#sidebar nav ul li {
-  border-bottom: 1px solid #ddd;
-}
-
 #sidebar nav ul li button {
   width: 100%;
   padding: 15px;
