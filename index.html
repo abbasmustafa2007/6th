@@ -1,105 +1,75 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Dashboard - النسخة التجريبية المتكاملة</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>منصة الدراسة</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- زر القائمة -->
+  <header>
+    <button id="menu-btn">☰</button>
+    <h1>منصة الدراسة</h1>
+  </header>
 
-<header class="header">
-  <div class="h-left">
-    <button id="menuBtn" class="menu-btn" aria-label="قائمة">☰</button>
-    <span class="h-title">Study Dashboard — الملف الرئيسي</span>
-  </div>
-  <div class="h-right">
-    <label class="small muted">عرض يوم:</label>
-    <input id="viewDate" type="date" />
-    <button id="goDate" class="btn small">عرض</button>
-  </div>
-</header>
+  <!-- القائمة الجانبية -->
+  <aside id="sidebar" aria-hidden="true">
+    <nav>
+      <ul>
+        <li><button onclick="showTab('dashboard')">الرئيسية</button></li>
+        <li><button onclick="showTab('reports')">التقارير</button></li>
+        <li><button onclick="showTab('grades')">الدرجات</button></li>
+        <li><button onclick="showTab('stats')">الإحصائيات</button></li>
+        <li><button onclick="showTab('archive')">الأرشيف</button></li>
+        <li><button onclick="showTab('add-task')">إضافة واجب</button></li>
+      </ul>
+    </nav>
+  </aside>
+  <div id="overlay"></div>
 
-<nav id="sidebar" class="sidebar" aria-hidden="true">
-  <div class="sidebar-inner">
-    <div class="sidebar-title">القائمة</div>
-    <button class="navlink" data-tab="dashboard">🏠 الرئيسية (مهام اليوم)</button>
-    <button class="navlink" data-tab="reports">📑 التقارير</button>
-    <button class="navlink" data-tab="grades">📚 الدرجات</button>
-    <button class="navlink" data-tab="stats">📈 الإحصائيات</button>
-    <button class="navlink" data-tab="archive">🗂️ الأرشيف</button>
-    <button class="navlink" data-tab="add">➕ إضافة واجب</button>
-    <hr>
-    <div class="small muted">البيانات تُحمّل من <code>data.js</code>. يمكنك إضافة واجبات أو تصدير البيانات.</div>
-    <div style="margin-top:10px">
-      <button id="exportBtn" class="btn">تصدير data.js</button>
-      <button id="resetBtn" class="btn ghost">إعادة الحالة الأولية</button>
-    </div>
-  </div>
-</nav>
+  <!-- المحتوى -->
+  <main>
+    <!-- اختيار اليوم -->
+    <section id="dashboard" class="tab">
+      <h2>واجبات وامتحانات اليوم</h2>
+      <input type="date" id="view-date">
+      <div id="tasks-list"></div>
+      <div id="exams-list"></div>
+    </section>
 
-<div id="overlay" class="overlay" tabindex="-1"></div>
+    <section id="reports" class="tab hidden">
+      <h2>التقارير</h2>
+      <div id="reports-content"></div>
+    </section>
 
-<main class="container">
+    <section id="grades" class="tab hidden">
+      <h2>الدرجات</h2>
+      <div id="grades-content"></div>
+    </section>
 
-  <!-- Dashboard -->
-  <section id="dashboard" class="card">
-    <h2>مهام اليوم <small id="todayDate"></small></h2>
-    <ul id="todayList" class="tasks-list" aria-live="polite"></ul>
+    <section id="stats" class="tab hidden">
+      <h2>الإحصائيات</h2>
+      <div id="stats-content"></div>
+    </section>
 
-    <h3 style="margin-top:14px">الامتحانات اليوم</h3>
-    <ul id="todayExams" class="tasks-list"></ul>
-  </section>
+    <section id="archive" class="tab hidden">
+      <h2>الأرشيف</h2>
+      <div id="archive-content"></div>
+    </section>
 
-  <!-- Add task -->
-  <section id="add" class="card section-hidden">
-    <h2>إضافة واجب جديد</h2>
-    <div class="form-row"><label>المادة</label><input id="new_subject" placeholder="مثال: كيمياء"></div>
-    <div class="form-row"><label>الوصف</label><input id="new_content" placeholder="مثال: قراءة ومراجعة الفصل 1"></div>
-    <div class="form-row"><label>عدد الساعات</label><input id="new_hours" type="number" value="1" min="1"></div>
-    <div class="form-row"><label>التاريخ</label><input id="new_date" type="date"></div>
-    <div style="margin-top:8px"><button id="saveTask" class="btn">حفظ وإضافة</button></div>
-    <div class="muted small" style="margin-top:10px">يُضاف الواجب إلى قاعدة البيانات المحلية للموقع.</div>
-  </section>
+    <section id="add-task" class="tab hidden">
+      <h2>إضافة واجب</h2>
+      <form id="add-task-form">
+        <label>المادة: <input type="text" id="task-subject" required></label><br>
+        <label>الوصف: <input type="text" id="task-desc" required></label><br>
+        <label>الساعات: <input type="number" id="task-hours" required></label><br>
+        <label>التاريخ: <input type="date" id="task-date" required></label><br>
+        <button type="submit">إضافة</button>
+      </form>
+    </section>
+  </main>
 
-  <!-- Reports -->
-  <section id="reports" class="card section-hidden">
-    <h2>التقارير</h2>
-    <div id="reportsContent"></div>
-  </section>
-
-  <!-- Grades -->
-  <section id="grades" class="card section-hidden">
-    <h2>الدرجات</h2>
-    <div id="gradesContent"></div>
-  </section>
-
-  <!-- Stats -->
-  <section id="stats" class="card section-hidden">
-    <h2>الإحصائيات</h2>
-    <div id="statsContent"></div>
-  </section>
-
-  <!-- Archive -->
-  <section id="archive" class="card section-hidden">
-    <h2>الأرشيف</h2>
-    <div id="archiveContent"></div>
-  </section>
-
-</main>
-
-<!-- Exam modal (same-page) -->
-<div id="examModal" class="modal section-hidden" role="dialog" aria-modal="true">
-  <div class="modal-inner card">
-    <div style="text-align:left"><button id="closeExam" class="btn ghost">إغلاق</button></div>
-    <h3 id="examTitleShow"></h3>
-    <div id="examQuestions"></div>
-    <div style="margin-top:10px"><button id="submitExamBtn" class="btn">إرسال الإجابات للتصحيح</button></div>
-    <div id="examResult" style="margin-top:12px"></div>
-  </div>
-</div>
-
-<script src="data.js"></script>
-<script src="script.js"></script>
+  <script src="data.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
