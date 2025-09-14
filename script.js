@@ -1,370 +1,185 @@
-// ===================== script.js (معدّل: إصلاح أزرار sidebar وإخفاء المهام المكتملة) =====================
-// مفاتيح التخزين
-const STORAGE_KEY_DATA = 'STUDY_DATA_FINAL_V1';
-const STORAGE_KEY_RESULTS = 'STUDY_RESULTS_FINAL_V1';
-const ARCHIVE_KEY = 'STUDY_ARCHIVE_FINAL_V1';
-const LAST_VIEW_KEY = 'STUDY_LAST_VIEW_FINAL_V1';
+// ===================== script.js (نسخة مُصلحة كاملة) =====================
+const STORAGE_KEY_DATA = 'STUDY_DATA_FINAL_V2';
+const STORAGE_KEY_RESULTS = 'STUDY_RESULTS_FINAL_V2';
+const ARCHIVE_KEY = 'STUDY_ARCHIVE_FINAL_V2';
 const todayIsoReal = new Date().toISOString().slice(0,10);
 
-// ======= أدوات مساعدة =======
+// ======= أدوات =======
 function safeJSONParse(s, fallback){ try{ return JSON.parse(s); }catch(e){ return fallback; } }
 function uid(){ return '_' + Math.random().toString(36).slice(2,10); }
 function escapeHtml(s){ return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function normalizeText(s){ return (s||'').toString().toLowerCase().trim(); }
 
-// ======= دوال العثور على عناصر DOM بعدة أسماء محتملة (fallbacks) =======
-const _POSS = {
-  viewDate: ['#viewDate','viewDate','input[name=\"viewDate\"]','#dateInput','.view-date'],
-  tasksContainer: ['#todayList','#tasksList','todayList','tasksList','.tasks-list'],
-  examsContainer: ['#examsArea','#examsList','examsArea','examsList','.exams-area'],
-  todayDate: ['#todayDate','todayDate','.today-date'],
-  examModal: ['#examModal','.exam-modal','#modalExam'],
-  overlay: ['#overlay','.overlay','#screenOverlay'],
-  examQuestions: ['#examQuestions','.exam-questions'],
-  submitExamBtn: ['#submitExamBtn','.submit-exam','button[data-action=\"submit-exam\"]'],
-  examResult: ['#examResult','.exam-result'],
-  examTitleShow: ['#examTitleShow','.exam-title'],
-  closeExamBtn: ['#closeExamBtn','.close-exam-btn'],
-  menuBtn: ['#menuBtn','.menu-btn','.hamburger'],
-  sidebar: ['#sidebar','.sidebar','.side-menu'],
-  addTaskBtn: ['#addTaskBtn','.add-task'],
-  goDate: ['#goDate','.go-date'],
-  todayBtn: ['#todayBtn','.today-btn'],
-  resetBtn: ['#resetBtn','.reset-btn'],
-  archiveList: ['#archiveList','.archive-list'],
-  reportsList: ['#reportsList','.reports-list'],
-  statsArea: ['#statsArea','.stats-area']
-};
-function getEl(key){
-  const arr = _POSS[key] || [];
-  for(const s of arr){
-    if(!s) continue;
-    if(!s.startsWith('.') && !s.startsWith('#') && document.getElementById(s)) return document.getElementById(s);
-    try{
-      const q = document.querySelector(s);
-      if(q) return q;
-    }catch(e){}
-  }
-  return null;
-}
-
-// ======= تحميل البيانات (من localStorage أو getInitialData()) =======
+// ======= تحميل بيانات =======
 let DATA = safeJSONParse(localStorage.getItem(STORAGE_KEY_DATA), null);
-if(!DATA){
-  if(typeof window.getInitialData === 'function') DATA = window.getInitialData();
-  else DATA = {};
-}
+if(!DATA){ if(typeof window.getInitialData === 'function') DATA = window.getInitialData(); else DATA = {}; }
 let RESULTS = safeJSONParse(localStorage.getItem(STORAGE_KEY_RESULTS), []);
 if(!safeJSONParse(localStorage.getItem(ARCHIVE_KEY), null)) localStorage.setItem(ARCHIVE_KEY, JSON.stringify([]));
 
-// ======= حفظ (debounce) =======
-let _saveTimeout = null;
-function saveAllImmediate(){
-  try{
+function saveAll(){ 
+  try{ 
     localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(DATA));
     localStorage.setItem(STORAGE_KEY_RESULTS, JSON.stringify(RESULTS));
-  }catch(e){
-    console.error('saveAllImmediate error', e);
-  }
-}
-function saveAll(){
-  if(_saveTimeout) clearTimeout(_saveTimeout);
-  _saveTimeout = setTimeout(()=>{ saveAllImmediate(); _saveTimeout = null; }, 200);
+  }catch(e){ console.error(e); }
 }
 
-// ======= مساعدة: اختيار تاريخ تلقائي (last view أو اليوم أو أقرب تاريخ موجود) =======
-function pickInitialDate(){
-  const last = localStorage.getItem(LAST_VIEW_KEY);
-  if(last) return last;
-  if(DATA && Object.keys(DATA).length){
-    if(DATA[todayIsoReal]) return todayIsoReal;
-    const keys = Object.keys(DATA).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k));
-    if(keys.length){
-      let best=keys[0], bestDiff = Math.abs(dayDiff(keys[0], todayIsoReal));
-      for(let k of keys){
-        const d = Math.abs(dayDiff(k, todayIsoReal));
-        if(d < bestDiff){ best = k; bestDiff = d; }
-      }
-      return best;
-    }
-  }
-  return todayIsoReal;
-}
-function dayDiff(aIso,bIso){
-  const a = new Date(aIso + 'T00:00:00'); const b = new Date(bIso + 'T00:00:00');
-  return Math.round((a - b)/(1000*60*60*24));
+// ======= إظهار قسم معين =======
+function showSection(name){
+  document.querySelectorAll('.section').forEach(sec => sec.classList.add('section-hidden'));
+  const target = document.getElementById(name);
+  if(target) target.classList.remove('section-hidden');
 }
 
-// ======= عرض الواجهة اليومية (مهام + امتحانات) =======
-function renderDashboard(dateIso){
-  if(!dateIso) dateIso = pickInitialDate();
-  try{ localStorage.setItem(LAST_VIEW_KEY, dateIso); }catch(e){}
-  const todayDateEl = getEl('todayDate'); if(todayDateEl) todayDateEl.innerText = dateIso;
-  const tasksEl = getEl('tasksContainer');
-  const examsEl = getEl('examsContainer');
+// ======= عرض واجبات اليوم =======
+function renderDashboard(dateIso = todayIsoReal){
+  const todayDateEl = document.getElementById('todayDate');
+  if(todayDateEl) todayDateEl.innerText = dateIso;
 
+  const tasksEl = document.getElementById('todayList');
+  const examsEl = document.getElementById('examsArea');
   if(tasksEl) tasksEl.innerHTML = '';
   if(examsEl) examsEl.innerHTML = '';
 
   const day = DATA[dateIso] || { tasks: [], exams: [] };
 
-  // عرض المهام — الآن نتجاهل المهام المكتملة (done === true)
+  // المهام
   const visibleTasks = (day.tasks || []).filter(t => !t.done);
   if(visibleTasks.length === 0){
-    if(tasksEl) tasksEl.innerHTML = `<li style="list-style:none;padding:10px;color:#666">لا توجد مهام لهذا اليوم.</li>`;
+    tasksEl.innerHTML = `<li style="color:#666">لا توجد مهام لهذا اليوم.</li>`;
   } else {
     visibleTasks.forEach(task=>{
       const li = document.createElement('li');
-      li.style.padding='8px 6px';
       li.innerHTML = `<span>${escapeHtml(task.text)}</span>
-        <button class="mark-done" data-id="${task.id}" style="margin-left:8px">تم</button>`;
+        <button class="mark-done" data-id="${task.id}">تم</button>`;
       tasksEl.appendChild(li);
     });
-    // ربط أزرار التحديد كمكتمل
     tasksEl.querySelectorAll('.mark-done').forEach(b=>{
       b.addEventListener('click', ()=>{
-        const id = b.dataset.id;
-        markTaskDoneById(dateIso, id);
-        // بعد الكتابة، نعيد العرض (المهمة لن تظهر لأننا نعرض فقط غير المكتملة)
+        markTaskDoneById(dateIso, b.dataset.id);
         renderDashboard(dateIso);
         renderArchive();
-        renderReports();
-        renderStats();
       });
     });
   }
 
-  // عرض الامتحانات
+  // الامتحانات
   if((day.exams||[]).length === 0){
-    if(examsEl) examsEl.innerHTML = `<div style="color:#666;padding:8px">لا توجد امتحانات لهذا اليوم.</div>`;
+    examsEl.innerHTML = `<div style="color:#666">لا توجد امتحانات لهذا اليوم.</div>`;
   } else {
     (day.exams||[]).forEach((ex, idx)=>{
-      const wrap = document.createElement('div');
-      wrap.className = 'exam-row';
-      wrap.style.marginBottom='10px';
-      wrap.innerHTML = `<strong>${escapeHtml(ex.title||'امتحان')}</strong> (${escapeHtml(ex.subject||'عام')}) - <button class="start-exam" data-idx="${idx}">ابدأ الامتحان</button>`;
-      examsEl.appendChild(wrap);
+      const div = document.createElement('div');
+      div.innerHTML = `<strong>${escapeHtml(ex.title||'امتحان')}</strong> (${escapeHtml(ex.subject||'عام')}) 
+        - <button class="start-exam" data-idx="${idx}">ابدأ الامتحان</button>`;
+      examsEl.appendChild(div);
     });
     examsEl.querySelectorAll('.start-exam').forEach(b=>{
-      b.addEventListener('click', ()=> startExam(dateIso, parseInt(b.dataset.idx)) );
+      b.addEventListener('click', ()=> startExam(dateIso, parseInt(b.dataset.idx)));
     });
   }
 }
 
-// ======= تعليم مهمة كمكتملة وأرشفتها =======
 function markTaskDoneById(dateIso, id){
   const arr = (DATA[dateIso] && DATA[dateIso].tasks) || [];
   const idx = arr.findIndex(x=>x.id === id);
-  if(idx === -1) return false;
+  if(idx === -1) return;
   arr[idx].done = true;
   const archive = safeJSONParse(localStorage.getItem(ARCHIVE_KEY), []);
-  archive.push(Object.assign({}, arr[idx], { completedAt: new Date().toISOString(), originDate: dateIso }));
+  archive.push({...arr[idx], completedAt: new Date().toISOString(), originDate: dateIso});
   localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archive));
   saveAll();
-  return true;
 }
 
-// ======= فتح الامتحان (مودال) =======
+// ======= فتح الامتحان =======
 function startExam(dateIso, examIndex){
   const day = DATA[dateIso];
-  if(!day) { alert('لا توجد بيانات لهذا التاريخ'); return; }
   const exam = (day.exams || [])[examIndex];
-  if(!exam) { alert('الامتحان غير متوفر'); return; }
+  if(!exam) return alert('الامتحان غير موجود');
 
-  const examModal = getEl('examModal');
-  const overlay = getEl('overlay');
-  const qArea = getEl('examQuestions');
-  const resultArea = getEl('examResult');
-  const titleEl = getEl('examTitleShow');
-  if(!examModal || !overlay || !qArea || !resultArea || !titleEl){
-    alert('مكونات المودال غير موجودة في HTML (examModal, overlay, examQuestions, examResult, examTitleShow)');
-    return;
-  }
-
-  // ملء الأسئلة
-  titleEl.innerText = `${exam.title || 'امتحان'} • ${exam.subject || ''}`;
+  document.getElementById('examTitleShow').innerText = `${exam.title} • ${exam.subject}`;
+  const qArea = document.getElementById('examQuestions');
   qArea.innerHTML = '';
-  (exam.questions || []).forEach((q,i)=>{
-    const row = document.createElement('div');
-    row.className = 'exam-question';
-    row.style.marginBottom='10px';
-    row.innerHTML = `<div><strong>س${i+1}:</strong> ${escapeHtml(q.text||'')}</div>
-      <div><textarea name="q${i}" style="width:100%;min-height:80px;margin-top:6px;padding:6px"></textarea></div>`;
-    qArea.appendChild(row);
+  exam.questions.forEach((q,i)=>{
+    qArea.innerHTML += `
+      <div><strong>س${i+1}:</strong> ${escapeHtml(q.text)}</div>
+      <textarea name="q${i}" style="width:100%;margin:6px 0"></textarea>
+    `;
   });
-  resultArea.innerHTML = '';
-  examModal.classList.remove('section-hidden');
-  overlay.classList.add('show');
+  document.getElementById('examResult').innerHTML = '';
+  document.getElementById('examModal').classList.remove('section-hidden');
+  document.getElementById('overlay').classList.add('show');
 
-  // اظهار زر الإغلاق المرسل منك إذا موجود
-  const closeExamBtn = getEl('closeExamBtn');
-  if(closeExamBtn) closeExamBtn.style.display = 'inline-block';
+  const submitBtn = document.getElementById('submitExamBtn');
+  submitBtn.onclick = ()=>{
+    const answers = exam.questions.map((_,i)=> (document.querySelector(`textarea[name="q${i}"]`)||{}).value || '');
+    const details = exam.questions.map((q,i)=>({
+      question: q.text,
+      given: answers[i],
+      answer: q.answer,
+      correct: normalizeText(answers[i]) === normalizeText(q.answer)
+    }));
+    const score = Math.round(details.filter(d=>d.correct).length / exam.questions.length * 100);
+    RESULTS.push({ title: exam.title, subject: exam.subject, date: dateIso, score, details });
+    saveAll();
 
-  // ربط زر الإرسال مع إزالة مستمعين سابقين (استبدال العنصر)
-  const submitBtn = getEl('submitExamBtn');
-  if(submitBtn){
-    const newBtn = submitBtn.cloneNode(true);
-    submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-    newBtn.addEventListener('click', function(){
-      newBtn.disabled = true;
-      // جمع الإجابات وتقييم
-      const answers = (exam.questions || []).map((_,i)=> (document.querySelector(`textarea[name="q${i}"]`) || {value:''}).value.trim());
-      const details = (exam.questions || []).map((q,i)=>{
-        const ok = normalizeText(answers[i]) === normalizeText(q.answer || '');
-        return { question: q.text || '', given: answers[i] || '', answer: q.answer || '', correct: ok };
-      });
-      const correctCount = details.filter(d=>d.correct).length;
-      const score = Math.round((correctCount / Math.max(1, (exam.questions||[]).length)) * 100);
-      const resultEntry = { examId: exam.id || uid(), title: exam.title||'', subject: exam.subject||'', date: dateIso, score, details };
-      RESULTS.push(resultEntry);
-      saveAll();
-      // عرض النتائج داخل المودال
-      let html = `<h4>النتيجة: ${score}%</h4>`;
-      details.forEach((d, idx)=> {
-        html += `<div style="margin-bottom:8px">س${idx+1}: <strong style="color:${d.correct ? 'green':'red'}">${d.correct ? '✔ صحيح':'✖ خطأ'}</strong><br>إجابتك: ${escapeHtml(d.given)}<br>الصحيح: ${escapeHtml(d.answer)}</div>`;
-      });
-      resultArea.innerHTML = html;
-      setTimeout(()=> newBtn.disabled = false, 800);
-      renderReports();
-      renderStats();
-    });
-  }
+    let html = `<h4>النتيجة: ${score}/100</h4>`;
+    details.forEach((d, i)=> html += `<div>س${i+1}: ${d.correct?'✔':'✖'} <br>إجابتك: ${escapeHtml(d.given)} <br>الصحيح: ${escapeHtml(d.answer)}</div>`);
+    document.getElementById('examResult').innerHTML = html;
+    renderReports(); renderStats();
+  };
 }
 
-// ======= زر إغلاق الامتحان (الذي أرسلته) =======
-function setupCloseExamBinding(){
-  const closeBtn = getEl('closeExamBtn');
-  const examModal = getEl('examModal');
-  const overlay = getEl('overlay');
-  if(!closeBtn) return;
-  closeBtn.style.display = 'none';
-  closeBtn.addEventListener('click', function(){
-    if(examModal) examModal.classList.add('section-hidden');
-    if(overlay) overlay.classList.remove('show');
-    this.style.display = 'none';
-    const qArea = getEl('examQuestions'); if(qArea) qArea.innerHTML = '';
-    const resultArea = getEl('examResult'); if(resultArea) resultArea.innerHTML = '';
-    alert('تم إغلاق الامتحان ✅');
-  });
-}
+// زر إغلاق الامتحان
+document.getElementById('closeExamBtn').addEventListener('click', ()=>{
+  document.getElementById('examModal').classList.add('section-hidden');
+  document.getElementById('overlay').classList.remove('show');
+});
 
-// ======= الأرشيف والتقارير والإحصاءات =======
+// ======= التقارير والإحصائيات =======
 function renderArchive(){
-  const arch = safeJSONParse(localStorage.getItem(ARCHIVE_KEY), []);
-  const ul = getEl('archiveList');
-  if(!ul) return;
+  const ul = document.getElementById('archiveList');
   ul.innerHTML = '';
-  (arch||[]).forEach(a=>{
-    const li = document.createElement('li');
-    li.textContent = `${a.text || a.title || 'عنصر'} • ${a.originDate || ''} ✔`;
-    ul.appendChild(li);
-  });
+  const arch = safeJSONParse(localStorage.getItem(ARCHIVE_KEY), []);
+  arch.forEach(a=> ul.innerHTML += `<li>${a.text} • ${a.originDate} ✔</li>`);
 }
 function renderReports(){
-  const ul = getEl('reportsList');
-  if(!ul) return;
+  const ul = document.getElementById('reportsList');
   ul.innerHTML = '';
-  (RESULTS||[]).forEach(r=>{
-    const li = document.createElement('li');
-    li.textContent = `${r.date || ''} • ${r.title || 'امتحان'} (${r.subject||''}) : ${r.score}%`;
-    ul.appendChild(li);
-  });
+  RESULTS.forEach(r=> ul.innerHTML += `<li>${r.date} • ${r.title} (${r.subject}) : ${r.score}%</li>`);
 }
 function renderStats(){
-  const node = getEl('statsArea');
-  if(!node) return;
-  const total = (RESULTS||[]).length;
-  if(total === 0){ node.innerHTML = '<p>لا يوجد بيانات.</p>'; return; }
-  const avg = ((RESULTS.reduce((a,b)=>a + (b.score||0),0) / total) || 0).toFixed(1);
+  const node = document.getElementById('statsArea');
+  const total = RESULTS.length;
+  if(total===0) return node.innerHTML = '<p>لا يوجد بيانات.</p>';
+  const avg = (RESULTS.reduce((a,b)=>a+b.score,0)/total).toFixed(1);
   node.innerHTML = `<p>عدد الامتحانات: ${total} • المعدل: ${avg}%</p>`;
 }
 
-// ======= إعداد وتفعيل شريط القائمة (يُشغّل بعد تحميل DOM) =======
-function setupMenuToggle(){
-  const menuBtn = getEl('menuBtn');
-  const sidebar = getEl('sidebar');
-  const overlay = getEl('overlay');
-  if(!menuBtn || !sidebar) return;
+// ======= القائمة الجانبية =======
+function setupSidebar(){
+  const menuBtn = document.getElementById('menuBtn');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
 
-  menuBtn.addEventListener('click', ()=>{
-    sidebar.classList.toggle('open');
-    if(overlay) overlay.classList.toggle('show');
-  });
+  menuBtn.addEventListener('click', ()=>{ sidebar.classList.toggle('open'); overlay.classList.toggle('show'); });
+  overlay.addEventListener('click', ()=>{ sidebar.classList.remove('open'); overlay.classList.remove('show'); });
 
-  // النقر على الـ overlay يغلق الشريط والمودالات
-  if(overlay){
-    overlay.addEventListener('click', ()=>{
-      document.querySelectorAll('.modal').forEach(m=>m.classList.add('section-hidden'));
-      overlay.classList.remove('show');
-      const closeBtn = getEl('closeExamBtn'); if(closeBtn) closeBtn.style.display = 'none';
-      if(sidebar.classList.contains('open')) sidebar.classList.remove('open');
-    });
-  }
-
-  // Delegated listener: أي زر/رابط داخل الـ sidebar يقفلها عند الضغط
-  sidebar.addEventListener('click', (ev)=>{
-    const btn = ev.target.closest('button, a, .navlink');
-    if(btn){
-      // لا نغلق إذا الزر يملك data-no-close أو إذا هو زر يحتاج للبقاء (يمكن التعديل لاحقًا)
-      if(btn.dataset && btn.dataset.noClose === '1') return;
+  sidebar.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const target = btn.dataset.target;
+      if(target) showSection(target);
       sidebar.classList.remove('open');
-      if(overlay) overlay.classList.remove('show');
-    }
+      overlay.classList.remove('show');
+    });
   });
 }
 
-// ======= عناصر التحكم العامة (إضافة مهمة، اختيار تاريخ، أزرار) =======
+// ======= تشغيل عند بدء =======
 document.addEventListener('DOMContentLoaded', ()=>{
-  // bind menu & closeExam after DOM ready
-  setupMenuToggle();
-  setupCloseExamBinding();
-
-  const viewDateInput = getEl('viewDate') || document.querySelector('input[type="date"]');
-  const addTaskBtn = getEl('addTaskBtn');
-  const goDateBtn = getEl('goDate');
-  const todayBtn = getEl('todayBtn');
-  const resetBtn = getEl('resetBtn');
-
-  // تعيين قيمة التاريخ الافتراضي (آلياً)
-  const initial = pickInitialDate();
-  if(viewDateInput) viewDateInput.value = localStorage.getItem(LAST_VIEW_KEY) || initial;
-
-  // إضافة مهمة
-  if(addTaskBtn){
-    addTaskBtn.addEventListener('click', ()=>{
-      const txt = prompt('أدخل نص المهمة:');
-      if(!txt) return;
-      const dateIso = (viewDateInput && viewDateInput.value) ? viewDateInput.value : todayIsoReal;
-      if(!DATA[dateIso]) DATA[dateIso] = { tasks: [], exams: [] };
-      DATA[dateIso].tasks.push({ id: uid(), text: txt, done: false });
-      saveAll();
-      renderDashboard(dateIso);
-    });
-  }
-
-  if(goDateBtn && viewDateInput){
-    goDateBtn.addEventListener('click', ()=> renderDashboard(viewDateInput.value));
-  }
-  if(todayBtn && viewDateInput){
-    todayBtn.addEventListener('click', ()=> { viewDateInput.value = todayIsoReal; renderDashboard(todayIsoReal); });
-  }
-  if(resetBtn){
-    resetBtn.addEventListener('click', ()=>{
-      if(confirm('هل تريد إعادة ضبط البيانات؟')) {
-        localStorage.removeItem(STORAGE_KEY_DATA);
-        localStorage.removeItem(STORAGE_KEY_RESULTS);
-        localStorage.removeItem(ARCHIVE_KEY);
-        localStorage.removeItem(LAST_VIEW_KEY);
-        location.reload();
-      }
-    });
-  }
-
-  // render initial
-  renderDashboard((viewDateInput && viewDateInput.value) ? viewDateInput.value : initial);
+  setupSidebar();
+  renderDashboard(todayIsoReal);
   renderReports();
   renderStats();
   renderArchive();
-
-  console.log('Script initialized — initial date:', (viewDateInput && viewDateInput.value) ? viewDateInput.value : initial);
+  showSection('dashboard');
+  console.log('✅ Script جاهز');
 });
