@@ -1,222 +1,173 @@
-// script.js - النسخة المصححة والمتوافقة مع index.html النهائية
+// ================== إعداد البيانات ==================
 const STORAGE_KEY_DATA = 'STUDY_DATA_FINAL_V1';
 const STORAGE_KEY_RESULTS = 'STUDY_RESULTS_FINAL_V1';
+const todayIsoReal = new Date().toISOString().slice(0,10);
 
-// تحميل initial data من data.js أو من localStorage (التغييرات اللي اضفتها أنت)
-let DATA = JSON.parse(localStorage.getItem(STORAGE_KEY_DATA) || 'null');
+// أداة parsing آمنة
+function safeJSONParse(s, fallback){
+  try{
+    return JSON.parse(s);
+  }catch(e){
+    return fallback;
+  }
+}
+
+// تحميل البيانات
+let DATA = safeJSONParse(localStorage.getItem(STORAGE_KEY_DATA), null);
 if(!DATA){
   if(typeof window.getInitialData === 'function') DATA = window.getInitialData();
   else DATA = {};
-} else {
-  console.log('Loaded DATA from localStorage (custom)');
 }
-let RESULTS = JSON.parse(localStorage.getItem(STORAGE_KEY_RESULTS) || '[]');
+let RESULTS = safeJSONParse(localStorage.getItem(STORAGE_KEY_RESULTS), []);
 
-function saveAll(){ localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(DATA)); localStorage.setItem(STORAGE_KEY_RESULTS, JSON.stringify(RESULTS)); }
+// ================== أدوات مساعدة ==================
+function uid(){ return '_' + Math.random().toString(36).substr(2,9); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function normalizeText(s){ return (s||'').toLowerCase().trim(); }
 
-document.addEventListener('DOMContentLoaded', ()=>{
-  const menuBtn = document.getElementById('menuBtn');
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('overlay');
-  const navlinks = document.querySelectorAll('.navlink');
-  const viewDateInput = document.getElementById('viewDate');
-  const todayBtn = document.getElementById('todayBtn');
-  const goDate = document.getElementById('goDate');
-  const todayIsoReal = new Date().toISOString().split('T')[0];
+// ================== حفظ البيانات (debounce) ==================
+let _saveTimeout = null;
+function saveAllImmediate(){
+  localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(DATA));
+  localStorage.setItem(STORAGE_KEY_RESULTS, JSON.stringify(RESULTS));
+}
+function saveAll(){
+  if(_saveTimeout) clearTimeout(_saveTimeout);
+  _saveTimeout = setTimeout(()=>{ saveAllImmediate(); _saveTimeout = null; }, 250);
+}
 
-  // default view: use today's date (auto-detect). If DATA contains 2025-09-13, prefer it for testing
-  const testDate = '2025-09-13';
-  const lastView = localStorage.getItem('STUDY_LAST_VIEW_FINAL_V1');
-  viewDateInput.value = (DATA[testDate] ? testDate : (lastView || todayIsoReal));
+// ================== المهام ==================
+function markTaskDoneById(dateIso, id){
+  const arr = (DATA[dateIso] && DATA[dateIso].tasks) || [];
+  const idx = arr.findIndex(x => x.id === id);
+  if(idx === -1) return false;
+  const item = arr[idx];
+  item.done = true;
+  const archive = safeJSONParse(localStorage.getItem('STUDY_ARCHIVE_FINAL_V1'), []);
+  archive.push(Object.assign({}, item, { completedAt: new Date().toISOString(), originDate: dateIso }));
+  localStorage.setItem('STUDY_ARCHIVE_FINAL_V1', JSON.stringify(archive));
+  saveAll();
+  return true;
+}
 
-  // sidebar toggle with proper binding
-  function openSidebar(){ sidebar.classList.add('open'); overlay.classList.add('show'); sidebar.setAttribute('aria-hidden','false'); }
-  function closeSidebar(){ sidebar.classList.remove('open'); overlay.classList.remove('show'); sidebar.setAttribute('aria-hidden','true'); }
-  menuBtn.addEventListener('click', ()=> sidebar.classList.contains('open') ? closeSidebar() : openSidebar());
-  overlay.addEventListener('click', closeSidebar);
-  navlinks.forEach(btn=> btn.addEventListener('click', ()=>{ showTab(btn.dataset.tab); closeSidebar(); }));
+// ================== عرض الواجهة ==================
+const overlay = document.getElementById('overlay');
+const viewDateInput = document.getElementById('viewDate');
+viewDateInput.value = todayIsoReal;
 
-  function showTab(id){
-    ['dashboard','reports','grades','stats','archive','add'].forEach(x=>{
-      const el = document.getElementById(x);
-      if(!el) return;
-      if(x===id) el.classList.remove('section-hidden'); else el.classList.add('section-hidden');
-    });
-  }
-
-  // helpers
-  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]); }
-  function normalizeText(s){ return String(s||'').trim().replace(/\s+/g,' ').toLowerCase(); }
-  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-  function offsetDate(iso, off){ const d=new Date(iso); d.setDate(d.getDate()+off); return d.toISOString().split('T')[0]; }
-
-  // render dashboard for date (auto-detect today's date)
-  function renderDashboard(dateIso){
-    if(!dateIso) dateIso = viewDateInput.value || todayIsoReal;
-    document.getElementById('todayDate').innerText = dateIso;
-    localStorage.setItem('STUDY_LAST_VIEW_FINAL_V1', dateIso);
-
-    const ul = document.getElementById('todayList'); ul.innerHTML = '';
-    const examsArea = document.getElementById('examsArea'); examsArea.innerHTML = '';
-
-    const day = DATA[dateIso];
-    if(!day || (((day.tasks||[]).length)===0 && ((day.exams||[]).length)===0)){
-      ul.innerHTML = `<li style="list-style:none;padding:10px;color:#666">لا توجد بيانات لهذا اليوم (${dateIso}).</li>`;
-      const nearby = findNearbyDatesWithTasks(dateIso,7);
-      if(nearby.length){
-        ul.innerHTML += `<li style="list-style:none;margin-top:8px">تواريخ قريبة بها بيانات: ${nearby.map(d=>`<button class="btn small pick-date" data-date="${d}">${d}</button>`).join(' ')}</li>`;
-        setTimeout(()=>document.querySelectorAll('.pick-date').forEach(b=> b.addEventListener('click', ()=> { viewDateInput.value=b.dataset.date; renderDashboard(b.dataset.date); })),50);
-      }
-      return;
+function renderDashboard(dateIso){
+  const day = DATA[dateIso] || { tasks:[], exams:[] };
+  const tasksUl = document.getElementById('tasksList');
+  tasksUl.innerHTML='';
+  (day.tasks||[]).forEach(t=>{
+    const li=document.createElement('li');
+    li.innerHTML=`${escapeHtml(t.text)} ${t.done? '✅':''} <button class="mark-done" data-id="${t.id}">تم</button>`;
+    tasksUl.appendChild(li);
+  });
+  tasksUl.querySelectorAll('.mark-done').forEach(b=>b.addEventListener('click', ()=>{
+    const id = b.dataset.id;
+    if(markTaskDoneById(dateIso, id)){
+      renderDashboard(dateIso); renderArchive(); renderReports(); renderStats();
     }
+  }));
 
-    // show tasks (only not done)
-    (day.tasks||[]).forEach((t, idx)=>{
-      if(t.done) return;
-      const li = document.createElement('li'); li.style.listStyle='none';
-      li.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>${escapeHtml(t.subject||t.title||'مادة')}</strong><div style="font-size:13px;color:#555">${escapeHtml(t.content||t.title||'وصف')} • ${t.hours||0} س</div></div><div><button class="btn mark-done" data-id="${t.id||''}" data-idx="${idx}">✅ إكمال</button></div></div>`;
-      ul.appendChild(li);
-    });
-
-    // bind mark-done to move to archive
-    ul.querySelectorAll('.mark-done').forEach(b=> b.addEventListener('click', ()=>{
-      const idx = parseInt(b.dataset.idx,10); const id = b.dataset.id;
-      const arr = (DATA[dateIso] && DATA[dateIso].tasks) || [];
-      let item = null;
-      if(arr[idx] && arr[idx].id === id){ item = arr[idx]; arr[idx].done = true; }
-      else { const i = arr.findIndex(x=>x.id===id); if(i>-1){ item = arr[i]; arr[i].done = true; } }
-      if(item){
-        const archive = JSON.parse(localStorage.getItem('STUDY_ARCHIVE_FINAL_V1')||'[]');
-        archive.push(Object.assign({}, item, { completedAt: new Date().toISOString() }));
-        localStorage.setItem('STUDY_ARCHIVE_FINAL_V1', JSON.stringify(archive));
-        saveAll();
-        renderDashboard(dateIso); renderArchive(); renderReports(); renderStats();
-      } else { alert('حدث خطأ أثناء تحديث الواجب'); }
-    }));
-
-    // exams
-    (day.exams||[]).forEach((e, idx)=>{
-      const div = document.createElement('div'); div.className='card'; div.style.marginBottom='8px';
-      div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>${escapeHtml(e.title)}</strong><div style="font-size:13px;color:#555">${escapeHtml(e.subject)}</div></div><div><button class="btn start-exam" data-idx="${idx}">ابدأ الامتحان</button></div></div>`;
-      examsArea.appendChild(div);
-    });
-    examsArea.querySelectorAll('.start-exam').forEach(b=> b.addEventListener('click', ()=> startExam(dateIso, parseInt(b.dataset.idx,10))));
-  }
-
-  function findNearbyDatesWithTasks(centerIso, range){
-    const res=[];
-    for(let i=-range;i<=range;i++){ const d=offsetDate(centerIso,i); if(DATA[d] && (((DATA[d].tasks||[]).length) || ((DATA[d].exams||[]).length))) if(d!==centerIso) res.push(d); }
-    return res;
-  }
-
-  // exam modal: open, render questions, grading (text matching), save result + close button
-  function startExam(dateIso, examIndex){
-    const day = DATA[dateIso]; if(!day) return alert('لا يوجد هذا الامتحان'); const exam = day.exams[examIndex]; if(!exam) return alert('الامتحان غير موجود');
-    document.getElementById('examTitleShow').innerText = `${exam.title} • ${exam.subject}`;
-    const qArea = document.getElementById('examQuestions'); qArea.innerHTML = '';
-    exam.questions.forEach((q,i)=>{
-      const div = document.createElement('div'); div.className='exam-question';
-      div.innerHTML = `<div><strong>س${i+1}:</strong> ${escapeHtml(q.text)}</div><div><textarea name="q${i}" style="width:100%;height:90px;padding:8px;margin-top:8px"></textarea></div>`;
-      qArea.appendChild(div);
-    });
-    document.getElementById('examResult').innerHTML = '';
-    document.getElementById('examModal').classList.remove('section-hidden');
-    overlay.classList.add('show');
-
-    // attach submit handler
-    document.getElementById('submitExamBtn').onclick = function(){
-      const answers = exam.questions.map((_,i)=> (document.querySelector(`textarea[name="q${i}"]`).value||'').trim());
-      const details = exam.questions.map((q,i)=> { const ok = normalizeText(answers[i]) === normalizeText(q.answer||q.answer||q.answerText||q.answer || ''); return { question:q.text, given:answers[i]||'', answer:q.answer||'', correct:ok }; });
-      const correctCount = details.filter(d=>d.correct).length;
-      const score = Math.round((correctCount / exam.questions.length) * 100);
-      RESULTS.push({ examId: exam.id||uid(), title: exam.title, subject: exam.subject, date: dateIso, score: score, details: details });
-      saveAll();
-      let html = `<div style="padding:8px;border-radius:8px;background:linear-gradient(90deg,var(--brown-3),#fff)"><strong>النتيجة: ${score} / 100</strong></div><hr>`;
-      details.forEach((d,idx)=> html += `<div style="margin-top:8px"><strong>س${idx+1}:</strong> ${escapeHtml(d.question)}<br><strong>إجابتك:</strong> ${escapeHtml(d.given)}<br><strong>الصحيح:</strong> ${escapeHtml(d.answer)}<br><strong>الحالة:</strong> ${d.correct? '✅':'❌'}</div><hr>`);
-      document.getElementById('examResult').innerHTML = html;
-      renderGrades(); renderReports(); renderStats();
-    };
-  }
-
-  // close button already in index.html with id="closeExam"
-  document.getElementById('closeExam').addEventListener('click', ()=>{ document.getElementById('examModal').classList.add('section-hidden'); overlay.classList.remove('show'); });
-
-  // add task
-  document.getElementById('saveTask').addEventListener('click', ()=>{
-    const sub = document.getElementById('new_subject').value.trim();
-    const cont = document.getElementById('new_content').value.trim();
-    const hrs = parseInt(document.getElementById('new_hours').value,10) || 1;
-    const date = document.getElementById('new_date').value || viewDateInput.value || todayIsoReal;
-    if(!sub || !cont){ alert('اكمل الحقول'); return; }
-    DATA[date] = DATA[date] || { tasks: [], exams: [] };
-    DATA[date].tasks.push({ id:`t-${date}-${uid()}`, subject: sub, content: cont, hours: hrs, done:false, createdAt:new Date().toISOString() });
-    saveAll();
-    alert('تمت إضافة الواجب');
-    showTab('dashboard');
-    viewDateInput.value = date;
-    renderDashboard(date);
+  const examsUl = document.getElementById('examsList');
+  examsUl.innerHTML='';
+  (day.exams||[]).forEach((ex,idx)=>{
+    const li=document.createElement('li');
+    li.innerHTML=`${escapeHtml(ex.title)} <button class="start-exam" data-idx="${idx}">ابدأ</button>`;
+    examsUl.appendChild(li);
   });
+  examsUl.querySelectorAll('.start-exam').forEach(b=>b.addEventListener('click', ()=>{
+    startExam(dateIso, parseInt(b.dataset.idx));
+  }));
+}
 
-  // grades table
-  function renderGrades(){ const c = document.getElementById('gradesContent'); c.innerHTML=''; if(RESULTS.length===0){ c.innerHTML='<div class="card">لا توجد درجات بعد.</div>'; return; } let html = '<table style="width:100%;border-collapse:collapse"><tr><th style="text-align:right;padding:8px">التاريخ</th><th style="text-align:right;padding:8px">المادة</th><th style="text-align:right;padding:8px">الامتحان</th><th style="text-align:right;padding:8px">الدرجة</th></tr>'; RESULTS.slice().reverse().forEach(r=> html += `<tr><td style="padding:8px">${r.date}</td><td style="padding:8px">${escapeHtml(r.subject)}</td><td style="padding:8px">${escapeHtml(r.title)}</td><td style="padding:8px">${r.score}</td></tr>`); html += '</table>'; c.innerHTML = html; }
+// ================== إضافة مهمة ==================
+document.getElementById('addTaskBtn').addEventListener('click', ()=>{
+  const txt = prompt('أدخل المهمة:'); if(!txt) return;
+  const dateIso = viewDateInput.value || todayIsoReal;
+  if(!DATA[dateIso]) DATA[dateIso]={tasks:[],exams:[]};
+  DATA[dateIso].tasks.push({id:uid(), text:txt, done:false});
+  saveAll(); renderDashboard(dateIso);
+});
 
-  // reports: daily/weekly/monthly hours + rating/10
-  function renderReports(){
-    const c = document.getElementById('reportsContent'); c.innerHTML='';
-    const view = viewDateInput.value || todayIsoReal;
-    const day = DATA[view] || { tasks:[], exams:[] };
-    const planned = (day.tasks||[]).reduce((a,b)=>a+(b.hours||0),0);
-    const done = (day.tasks||[]).filter(t=>t.done).reduce((a,b)=>a+(b.hours||0),0);
-    let weekPlanned=0, weekDone=0; for(let i=0;i<7;i++){ const d=offsetDate(view,-i); const dd=DATA[d]||{tasks:[]}; weekPlanned+=(dd.tasks||[]).reduce((a,b)=>a+(b.hours||0),0); weekDone+=(dd.tasks||[]).filter(t=>t.done).reduce((a,b)=>a+(b.hours||0),0); }
-    let monPlanned=0, monDone=0; for(let i=0;i<30;i++){ const d=offsetDate(view,-i); const dd=DATA[d]||{tasks:[]}; monPlanned+=(dd.tasks||[]).reduce((a,b)=>a+(b.hours||0),0); monDone+=(dd.tasks||[]).filter(t=>t.done).reduce((a,b)=>a+(b.hours||0),0); }
-    const weekPct = weekPlanned? Math.round((weekDone/weekPlanned)*100):0;
-    const monPct = monPlanned? Math.round((monDone/monPlanned)*100):0;
-    const dayPct = planned? Math.round((done/planned)*100):0;
-    const ratingWeek = Math.round((weekPct/100)*10*10)/10;
-    const ratingMonth = Math.round((monPct/100)*10*10)/10;
-    let html = `<div class="card"><strong>ملخص الساعات</strong><div style="margin-top:8px">اليومي: ${done} من ${planned} س • نسبة الإنجاز: ${dayPct}%</div><div style="margin-top:6px">الأسبوعي: ${weekDone} من ${weekPlanned} س • ${weekPct}% • تقييم الأسبوع: ${ratingWeek} / 10</div><div style="margin-top:6px">الشهري: ${monDone} من ${monPlanned} س • ${monPct}% • تقييم الشهر: ${ratingMonth} / 10</div></div>`;
-    c.innerHTML = html;
-  }
+// ================== الامتحانات ==================
+function startExam(dateIso, examIndex){
+  const day = DATA[dateIso]; if(!day) return alert('لا يوجد هذا الامتحان');
+  const exam = day.exams[examIndex]; if(!exam) return alert('الامتحان غير موجود');
 
-  // stats per subject
-  function renderStats(){
-    const c = document.getElementById('statsContent'); c.innerHTML='';
-    const subjects={};
-    Object.keys(DATA).forEach(d=>{ (DATA[d].tasks||[]).forEach(t=>{ subjects[t.subject]=subjects[t.subject]||{planned:0,done:0}; subjects[t.subject].planned+=(t.hours||0); if(t.done) subjects[t.subject].done+=(t.hours||0); }); });
-    if(Object.keys(subjects).length===0){ c.innerHTML='<div class="card">لا توجد بيانات إحصائية.</div>'; return; }
-    let html = '<div class="stat">';
-    Object.keys(subjects).forEach(sub=>{ const s=subjects[sub]; const pct=s.planned? Math.round((s.done/s.planned)*100):0; html += `<div class="box"><strong>${escapeHtml(sub)}</strong><div style="font-size:13px;color:#555;margin-top:6px">${s.done} س من ${s.planned} س</div><div class="progress" style="margin-top:8px"><div style="width:${pct}%"></div></div><div style="margin-top:6px">${pct}% إنجاز</div></div>`; });
-    html += '</div>'; c.innerHTML = html;
-  }
-
-  // archive
-  function renderArchive(){
-    const container = document.getElementById('archiveContent'); container.innerHTML='';
-    const arc = JSON.parse(localStorage.getItem('STUDY_ARCHIVE_FINAL_V1')||'[]');
-    if(arc.length===0){ container.innerHTML='<div class="card">لا يوجد أرشيف بعد.</div>'; return; }
-    const groups={};
-    arc.forEach(a=>{ const d=(a.completedAt||'').split('T')[0]||'unknown'; groups[d]=groups[d]||[]; groups[d].push(a); });
-    Object.keys(groups).sort().reverse().forEach(d=>{ const div=document.createElement('div'); div.className='card'; let inner=`<strong>${d}</strong><div style="margin-top:8px">`; groups[d].forEach(it=> inner+=`<div style="margin-top:6px">${escapeHtml(it.subject)} - ${escapeHtml(it.content)} • ${it.hours} س</div>`); inner+=`</div>`; div.innerHTML=inner; container.appendChild(div); });
-  }
-
-  // export/reset
-  document.getElementById('exportBtn').addEventListener('click', ()=>{
-    const dataString = 'window.getInitialData = function(){ return ' + JSON.stringify(DATA,null,2) + '; };';
-    const blob = new Blob([dataString], {type:'text/javascript;charset=utf-8'});
-    const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='data.js'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  document.getElementById('examTitleShow').innerText = `${exam.title} • ${exam.subject}`;
+  const qArea = document.getElementById('examQuestions'); qArea.innerHTML='';
+  exam.questions.forEach((q,i)=>{
+    const div=document.createElement('div'); div.className='exam-question';
+    div.innerHTML=`<div><strong>س${i+1}:</strong> ${escapeHtml(q.text)}</div><div><textarea name="q${i}" style="width:100%;height:90px;padding:8px;margin-top:8px"></textarea></div>`;
+    qArea.appendChild(div);
   });
-  document.getElementById('resetBtn').addEventListener('click', ()=>{ if(confirm('ستُعاد البيانات للحالة الافتراضية. استمرار؟')){ localStorage.removeItem(STORAGE_KEY_DATA); localStorage.removeItem(STORAGE_KEY_RESULTS); localStorage.removeItem('STUDY_ARCHIVE_FINAL_V1'); localStorage.removeItem('STUDY_LAST_VIEW_FINAL_V1'); location.reload(); } });
+  document.getElementById('examResult').innerHTML='';
+  document.getElementById('examModal').classList.remove('section-hidden');
+  overlay.classList.add('show');
+  document.getElementById("closeExamBtn").style.display = "block"; // إظهار زر الإغلاق
 
-  // go/today
-  goDate.addEventListener('click', ()=>{ renderDashboard(viewDateInput.value); renderReports(); renderStats(); renderArchive(); renderGrades(); });
-  todayBtn.addEventListener('click', ()=>{ viewDateInput.value = todayIsoReal; renderDashboard(todayIsoReal); renderReports(); renderStats(); renderArchive(); renderGrades(); });
+  const submitBtn=document.getElementById('submitExamBtn');
+  const newBtn=submitBtn.cloneNode(true);
+  submitBtn.parentNode.replaceChild(newBtn, submitBtn);
 
-  // initial render
-  renderDashboard(viewDateInput.value || todayIsoReal);
-  renderReports();
-  renderStats();
-  renderArchive();
-  renderGrades();
+  newBtn.addEventListener('click', ()=>{
+    newBtn.disabled=true;
+    const answers=exam.questions.map((_,i)=> (document.querySelector(`textarea[name="q${i}"]`).value||'').trim());
+    const details=exam.questions.map((q,i)=>{const ok=normalizeText(answers[i])===normalizeText(q.answer||'');return {question:q.text,given:answers[i]||'',answer:q.answer||'',correct:ok};});
+    const correctCount=details.filter(d=>d.correct).length;
+    const score=Math.round((correctCount/exam.questions.length)*100);
+    const resultEntry={examId:exam.id||uid(),title:exam.title,subject:exam.subject,date:new Date().toISOString().slice(0,10),score:score,details:details};
+    RESULTS.push(resultEntry); saveAll();
+    let html=`<h4>النتيجة: ${score}%</h4>`;
+    details.forEach((d,idx)=>{html+=`<div>س${idx+1}: <span style="color:${d.correct?'green':'red'}">${d.correct?'✔ صحيح':'✖ خطأ'}</span><br>إجابتك: ${escapeHtml(d.given)}<br>الصحيح: ${escapeHtml(d.answer)}</div><hr>`;});
+    document.getElementById('examResult').innerHTML=html;
+  });
+}
 
-  console.log('Final dashboard loaded, view date:', viewDateInput.value, 'DATA days:', Object.keys(DATA).length);
-}); // DOMContentLoaded end
+// زر إغلاق الامتحان
+document.getElementById("closeExamBtn").addEventListener("click", function() {
+  document.getElementById("examModal").classList.add("section-hidden");
+  overlay.classList.remove("show");
+  this.style.display = "none";
+  alert("تم إغلاق الامتحان ✅");
+});
+
+// ================== الأرشيف ==================
+function renderArchive(){
+  const arch=safeJSONParse(localStorage.getItem('STUDY_ARCHIVE_FINAL_V1'),[]);
+  const ul=document.getElementById('archiveList'); ul.innerHTML='';
+  arch.forEach(a=>{
+    const li=document.createElement('li');
+    li.textContent=`${a.text} (${a.originDate}) ✔`;
+    ul.appendChild(li);
+  });
+}
+
+// ================== التقارير والإحصائيات ==================
+function renderReports(){
+  const ul=document.getElementById('reportsList'); ul.innerHTML='';
+  RESULTS.forEach(r=>{
+    const li=document.createElement('li');
+    li.textContent=`${r.date} • ${r.title} (${r.subject}) : ${r.score}%`;
+    ul.appendChild(li);
+  });
+}
+function renderStats(){
+  const div=document.getElementById('statsArea');
+  const total=RESULTS.length; if(total===0){div.innerHTML='<p>لا يوجد بيانات.</p>'; return;}
+  const avg=(RESULTS.reduce((a,b)=>a+b.score,0)/total).toFixed(1);
+  div.innerHTML=`<p>عدد الامتحانات: ${total} • المعدل: ${avg}%</p>`;
+}
+
+// ================== أحداث عامة ==================
+viewDateInput.addEventListener('change',()=>{renderDashboard(viewDateInput.value);});
+overlay.addEventListener('click',()=>{document.querySelectorAll('.modal').forEach(m=>m.classList.add('section-hidden')); overlay.classList.remove('show');});
+
+// عند بدء الصفحة
+renderDashboard(todayIsoReal);
+renderArchive();
+renderReports();
+renderStats();
