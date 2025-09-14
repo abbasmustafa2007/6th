@@ -52,7 +52,7 @@ function startExam(date, index) {
   const modal = document.getElementById("examModal");
   const modalContent = document.getElementById("exam-content");
   modal.style.display = "block";
-  modalContent.innerHTML = <h2>${exam.title}</h2>;
+  modalContent.innerHTML = `<h2>${exam.title}</h2>`;
 
   exam.questions.forEach((q, i) => {
     modalContent.innerHTML += `
@@ -97,7 +97,7 @@ function submitExam(exam) {
   });
 
   const resultDiv = document.createElement("div");
-  resultDiv.innerHTML = <h3>درجتك: ${score}/100</h3>;
+  resultDiv.innerHTML = `<h3>درجتك: ${score}/100</h3>`;
   document.getElementById("exam-content").appendChild(resultDiv);
 
   // حفظ الدرجة في سجل الدرجات
@@ -164,7 +164,7 @@ function loadArchive() {
   }
 
   archive.forEach(a => {
-    container.innerHTML += <p>${a.date}: ${a.title}</p>;
+    container.innerHTML += `<p>${a.date}: ${a.title}</p>`;
   });
 }
 
