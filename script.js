@@ -1,4 +1,4 @@
-// ===================== script.js (نسخة مرنة ومصححة) =====================
+// ===================== script.js (معدّل: إصلاح أزرار sidebar وإخفاء المهام المكتملة) =====================
 // مفاتيح التخزين
 const STORAGE_KEY_DATA = 'STUDY_DATA_FINAL_V1';
 const STORAGE_KEY_RESULTS = 'STUDY_RESULTS_FINAL_V1';
@@ -14,14 +14,14 @@ function normalizeText(s){ return (s||'').toString().toLowerCase().trim(); }
 
 // ======= دوال العثور على عناصر DOM بعدة أسماء محتملة (fallbacks) =======
 const _POSS = {
-  viewDate: ['#viewDate','viewDate','input[name="viewDate"]','#dateInput','.view-date'],
+  viewDate: ['#viewDate','viewDate','input[name=\"viewDate\"]','#dateInput','.view-date'],
   tasksContainer: ['#todayList','#tasksList','todayList','tasksList','.tasks-list'],
   examsContainer: ['#examsArea','#examsList','examsArea','examsList','.exams-area'],
   todayDate: ['#todayDate','todayDate','.today-date'],
   examModal: ['#examModal','.exam-modal','#modalExam'],
   overlay: ['#overlay','.overlay','#screenOverlay'],
   examQuestions: ['#examQuestions','.exam-questions'],
-  submitExamBtn: ['#submitExamBtn','.submit-exam','button[data-action="submit-exam"]'],
+  submitExamBtn: ['#submitExamBtn','.submit-exam','button[data-action=\"submit-exam\"]'],
   examResult: ['#examResult','.exam-result'],
   examTitleShow: ['#examTitleShow','.exam-title'],
   closeExamBtn: ['#closeExamBtn','.close-exam-btn'],
@@ -39,9 +39,7 @@ function getEl(key){
   const arr = _POSS[key] || [];
   for(const s of arr){
     if(!s) continue;
-    // try id first if string looks like plain id
     if(!s.startsWith('.') && !s.startsWith('#') && document.getElementById(s)) return document.getElementById(s);
-    // try querySelector for anything else
     try{
       const q = document.querySelector(s);
       if(q) return q;
@@ -78,10 +76,8 @@ function saveAll(){
 function pickInitialDate(){
   const last = localStorage.getItem(LAST_VIEW_KEY);
   if(last) return last;
-  // إذا في بيانات محفوظة وايام مختلفة، اختار اليوم إن له بيانات
   if(DATA && Object.keys(DATA).length){
     if(DATA[todayIsoReal]) return todayIsoReal;
-    // اختار التاريخ الأقرب لتاريح اليوم من المفاتيح
     const keys = Object.keys(DATA).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k));
     if(keys.length){
       let best=keys[0], bestDiff = Math.abs(dayDiff(keys[0], todayIsoReal));
@@ -112,14 +108,15 @@ function renderDashboard(dateIso){
 
   const day = DATA[dateIso] || { tasks: [], exams: [] };
 
-  // عرض المهام
-  if((day.tasks||[]).length === 0){
+  // عرض المهام — الآن نتجاهل المهام المكتملة (done === true)
+  const visibleTasks = (day.tasks || []).filter(t => !t.done);
+  if(visibleTasks.length === 0){
     if(tasksEl) tasksEl.innerHTML = `<li style="list-style:none;padding:10px;color:#666">لا توجد مهام لهذا اليوم.</li>`;
   } else {
-    (day.tasks||[]).forEach(task=>{
+    visibleTasks.forEach(task=>{
       const li = document.createElement('li');
       li.style.padding='8px 6px';
-      li.innerHTML = `<span>${escapeHtml(task.text)}</span> ${task.done?'<strong style="color:green;margin-left:6px">✔</strong>':''}
+      li.innerHTML = `<span>${escapeHtml(task.text)}</span>
         <button class="mark-done" data-id="${task.id}" style="margin-left:8px">تم</button>`;
       tasksEl.appendChild(li);
     });
@@ -128,6 +125,7 @@ function renderDashboard(dateIso){
       b.addEventListener('click', ()=>{
         const id = b.dataset.id;
         markTaskDoneById(dateIso, id);
+        // بعد الكتابة، نعيد العرض (المهمة لن تظهر لأننا نعرض فقط غير المكتملة)
         renderDashboard(dateIso);
         renderArchive();
         renderReports();
@@ -234,7 +232,7 @@ function startExam(dateIso, examIndex){
 }
 
 // ======= زر إغلاق الامتحان (الذي أرسلته) =======
-(function bindCloseExam(){
+function setupCloseExamBinding(){
   const closeBtn = getEl('closeExamBtn');
   const examModal = getEl('examModal');
   const overlay = getEl('overlay');
@@ -248,7 +246,7 @@ function startExam(dateIso, examIndex){
     const resultArea = getEl('examResult'); if(resultArea) resultArea.innerHTML = '';
     alert('تم إغلاق الامتحان ✅');
   });
-})();
+}
 
 // ======= الأرشيف والتقارير والإحصاءات =======
 function renderArchive(){
@@ -281,17 +279,19 @@ function renderStats(){
   node.innerHTML = `<p>عدد الامتحانات: ${total} • المعدل: ${avg}%</p>`;
 }
 
-// ======= زر الهامبرغر / الشريط الجانبي (مرن لعدة أسماء) =======
-(function bindMenuToggle(){
+// ======= إعداد وتفعيل شريط القائمة (يُشغّل بعد تحميل DOM) =======
+function setupMenuToggle(){
   const menuBtn = getEl('menuBtn');
   const sidebar = getEl('sidebar');
   const overlay = getEl('overlay');
   if(!menuBtn || !sidebar) return;
+
   menuBtn.addEventListener('click', ()=>{
     sidebar.classList.toggle('open');
     if(overlay) overlay.classList.toggle('show');
   });
-  // اضغط على overlay يغلق أي مودال أو الشريط الجانبي
+
+  // النقر على الـ overlay يغلق الشريط والمودالات
   if(overlay){
     overlay.addEventListener('click', ()=>{
       document.querySelectorAll('.modal').forEach(m=>m.classList.add('section-hidden'));
@@ -300,10 +300,25 @@ function renderStats(){
       if(sidebar.classList.contains('open')) sidebar.classList.remove('open');
     });
   }
-})();
+
+  // Delegated listener: أي زر/رابط داخل الـ sidebar يقفلها عند الضغط
+  sidebar.addEventListener('click', (ev)=>{
+    const btn = ev.target.closest('button, a, .navlink');
+    if(btn){
+      // لا نغلق إذا الزر يملك data-no-close أو إذا هو زر يحتاج للبقاء (يمكن التعديل لاحقًا)
+      if(btn.dataset && btn.dataset.noClose === '1') return;
+      sidebar.classList.remove('open');
+      if(overlay) overlay.classList.remove('show');
+    }
+  });
+}
 
 // ======= عناصر التحكم العامة (إضافة مهمة، اختيار تاريخ، أزرار) =======
 document.addEventListener('DOMContentLoaded', ()=>{
+  // bind menu & closeExam after DOM ready
+  setupMenuToggle();
+  setupCloseExamBinding();
+
   const viewDateInput = getEl('viewDate') || document.querySelector('input[type="date"]');
   const addTaskBtn = getEl('addTaskBtn');
   const goDateBtn = getEl('goDate');
