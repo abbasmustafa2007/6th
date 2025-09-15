@@ -1,19 +1,22 @@
-window.getInitialData = function() {
-  return {
-    "2025-09-15": {
-      tasks: [
-        { id: "t1", subject: "أحياء", content: "قراءة محاضرة 3-4-5", hours: 2, done: false, createdAt: "2025-09-15T08:00:00" }
-      ],
-      exams: [
-        {
-          id: "e1",
-          subject: "أحياء",
-          title: "امتحان محاضرة 1-2",
-          questions: [
-            { text: "سؤال تجريبي؟", answer: "إجابة" }
-          ]
-        }
+DATA["2025-09-19"] = {
+  tasks: [
+    { id:"t-2025-09-19-1", subject:"كيمياء", content:"حل مسائل المعادلات الكيميائية", hours:2, done:false, createdAt:"2025-09-19" },
+    { id:"t-2025-09-19-2", subject:"لغة عربية", content:"قراءة نصوص أدبية", hours:1, done:false, createdAt:"2025-09-19" },
+    { id:"t-2025-09-19-3", subject:"انكليزي", content:"مراجعة كلمات جديدة", hours:1, done:false, createdAt:"2025-09-19" }
+  ],
+  exams: [
+    {
+      id:"e-2025-09-19",
+      subject:"كيمياء",
+      title:"امتحان متوسط - كيمياء",
+      questions:[
+        { text:"ما هي الرابطة الأيونية؟", answer:"رابطة بين فلز ولافلز" },
+        { text:"ما هو عدد أفوجادرو؟", answer:"6.022×10^23" },
+        { text:"ما الفرق بين التفاعل الطارد والماص للحرارة؟", answer:"الطارد يطلق حرارة والماص يمتص حرارة" },
+        { text:"اذكر مثال على محلول متجانس.", answer:"محلول الملح في الماء" },
+        { text:"ما هو الرقم الهيدروجيني للماء النقي؟", answer:"7" },
+        { text:"ما هي الكتلة المولية لـ CO2؟", answer:"44 غ/مول" }
       ]
     }
-  };
+  ]
 };
